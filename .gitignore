@@ -1,0 +1,10 @@
+__pycache__/
+*.pyc
+.venv/
+venv/
+.ipynb_checkpoints/
+.DS_Store
+
+# Generated output (kept: one committed sample workbook for demo purposes —
+# see outputs/.gitkeep). Delete this line if you'd rather regenerate on clone.
+# outputs/*.xlsx

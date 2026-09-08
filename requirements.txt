@@ -1,0 +1,6 @@
+pandas>=2.0
+numpy>=1.24
+openpyxl>=3.1
+
+# optional, only needed to regenerate docs/images/*.png
+matplotlib>=3.7
