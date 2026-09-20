@@ -15,6 +15,10 @@ from .capacity_analysis import (
     at_risk_dcs, surplus_dcs, risk_by_service_type, undelivered_at_horizon_end,
 )
 from .scenario_analysis import run_capacity_expansion_scenario
+from .advanced_analysis import (
+    on_time_delivery_rate, staff_reallocation_plan, backtest_daily_trend,
+    multi_dc_scenario_comparison, region_summary,
+)
 from .report_export import build_workbook, TITLE_FONT, SECTION_FONT, BODY_FONT, ITALIC_FONT
 
 
@@ -52,6 +56,13 @@ def main():
     else:
         target_dc_name = dc_monthly.sort_values("avg_utilization", ascending=False).iloc[0]["DC Name"]
     scenario = run_capacity_expansion_scenario(artifacts, target_dc_name, capacity_multiplier=1.5)
+
+    print("5b/6 Running new advanced analyses (on-time rate, staff reallocation, backtest trend, multi-DC scenario)...")
+    otd_by_dc, network_on_time_rate = on_time_delivery_rate(fc)
+    realloc_plan = staff_reallocation_plan(dc_monthly)
+    bt_daily = backtest_daily_trend(bt)
+    multi_scenario = multi_dc_scenario_comparison(artifacts, risk_dcs, top_n=3)
+    region_stats = region_summary(dc_monthly)
 
     net_util = fc["Forecast Delivered Orders"].sum() / fc["Capacity"].where(fc["Capacity"] > 0).sum() * 100
     total_demand = sum(
@@ -103,17 +114,19 @@ def main():
         (f"- Network utilization: {net_util:.1f}%", BODY_FONT),
         (f"- Estimated total staff shifts needed: {fc['Est. Staff Needed'].sum():,}", BODY_FONT),
         (f"- DCs at structural risk: {len(risk_dcs)} | Surplus DCs: {len(surplus)}", BODY_FONT),
+        (f"- Network on-time delivery rate (same-day, not deferred): {network_on_time_rate*100:.1f}%", BODY_FONT),
         ("", BODY_FONT),
         ("MAIN RISKS", SECTION_FONT),
         (f"- Bottlenecks: {target_dc_name} and similar DCs approach 100% capacity on most days.", BODY_FONT),
         ("- Demand clustering: rolled-forward demand from closed days creates sharp spikes on the next open day.", BODY_FONT),
         ("", BODY_FONT),
         ("KEY RECOMMENDATIONS", SECTION_FONT),
-        ("1. Resource rebalancing: reallocate staff from surplus DCs to at-risk DCs using the 'Est. Staff Needed' column.", BODY_FONT),
+        ("1. Resource rebalancing: see the 'Staff Reallocation Plan' sheet for specific at-risk/surplus DC pairings.", BODY_FONT),
         ("2. Review operating hours: extending time windows at high-risk DCs can absorb deferred demand.", BODY_FONT),
         ("3. Policy review: evaluate the cost/benefit of keeping chronically-deferred DCs open on their closed day.", BODY_FONT),
         (f"- Scenario simulation: increasing {target_dc_name}'s capacity by 50% yields a net economic benefit of "
-         f"{scenario['cost_benefit'].iloc[2, 1]:,.0f} over the forecast horizon.", BODY_FONT),
+         f"{scenario['cost_benefit'].iloc[2, 1]:,.0f} over the forecast horizon -- see 'Multi-DC What-If Comparison' "
+         "for how this ranks against the other top at-risk DCs.", BODY_FONT),
     ]
 
     print("6/6  Exporting Excel workbook...")
@@ -121,6 +134,9 @@ def main():
         forecast_output=fc, network_daily=net_day, dc_monthly=dc_monthly,
         at_risk=risk_dcs, surplus=surplus, risk_by_type=type_summary,
         backtest_summary=bt_summary, undelivered=undeliv, scenario=scenario,
+        on_time_by_dc=otd_by_dc, network_on_time_rate=network_on_time_rate,
+        realloc_plan=realloc_plan, backtest_daily=bt_daily,
+        multi_scenario=multi_scenario, region_stats=region_stats,
         methodology_lines=methodology_lines, management_summary_lines=management_summary_lines,
         output_path=config.OUTPUT_WORKBOOK,
     )

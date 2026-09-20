@@ -159,6 +159,30 @@ network's physical constraints.
 to operational volume and gives a more realistic picture of network-wide
 performance than an unweighted average of percentage errors.
 
+## 7b. Advanced analyses (`src/advanced_analysis.py`)
+
+Four additional outputs surface decision-ready value that was already
+latent in the model but not previously reported as its own metric:
+
+- **On-Time Delivery Rate** — the forecast already tags each delivered
+  unit as same-day or deferred-from-a-closed-day at the row level. This
+  rolls that up into a network-wide and per-DC service-level percentage:
+  `same_day / (same_day + deferred)`.
+- **Staff Reallocation Plan** — a greedy matching: for each at-risk DC
+  (highest utilization first), pick the least-utilized surplus DC of the
+  same Service Type (falling back to any surplus DC), then recommend
+  transferring shifts equal to half the average daily staffing gap between
+  the two, floored at 1. Halving the gap is a deliberate conservative
+  choice — a first rebalancing move to evaluate, not a full fix in one step.
+- **Backtest Daily Trend** — simply the day-by-day network-wide actual vs.
+  capacity-constrained-predicted series that the aggregate backtest metrics
+  in section 7 are computed from, exposed directly for charting.
+- **Multi-DC What-If Comparison** — re-runs the existing single-DC capacity-
+  expansion scenario (section 6 methodology, unchanged) for each of the top
+  N at-risk DCs independently, then ranks them by net benefit. This is
+  still one-lever-at-a-time (see Future development ideas below for true
+  joint optimization), but turns a single scenario into a prioritized list.
+
 ## 8. Future development ideas
 
 - **Native sales forecasting**: replace the externally-provided sales
@@ -169,12 +193,11 @@ performance than an unweighted average of percentage errors.
   overfitting a more complex model to it.
 - **Multi-scenario optimization**: jointly evaluate multiple capacity,
   shift, and resource-allocation scenarios to find the best combined
-  operational decision, instead of one scenario at a time.
+  operational decision, instead of one scenario at a time (the current
+  Multi-DC What-If Comparison ranks several single-lever scenarios, but
+  doesn't yet jointly optimize across them).
 - **Advanced cost/benefit modeling**: build out a fuller economic module
   that accounts for overtime cost, staff-transfer cost, and budget
   constraints.
 - **External factor integration**: incorporate weather, marketing campaigns,
   and calendar events (holidays, sale events) to improve forecast accuracy.
-- **BI dashboard deployment**: publish an interactive dashboard (e.g. Power
-  BI, Looker, or a lightweight web app) for real-time capacity and scenario
-  analysis.

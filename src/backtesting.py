@@ -26,7 +26,7 @@ def run_backtest(historical: pd.DataFrame, artifacts: ForecastArtifacts) -> pd.D
         tr = train.groupby(["DC ID", "TS"])["Items"].sum().reset_index()
         tr["share"] = tr["Items"] / train["Items"].sum()
 
-        pred = test[["DC ID", "TS", "Weekday", "Items", "Orders"]].merge(
+        pred = test[["DateNorm", "DC ID", "TS", "Weekday", "Items", "Orders"]].merge(
             tr[["DC ID", "TS", "share"]], on=["DC ID", "TS"], how="left"
         ).fillna(0)
 

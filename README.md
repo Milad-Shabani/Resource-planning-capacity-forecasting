@@ -16,6 +16,52 @@ operational plan — with capacity risk detection, staffing estimates, and what-
 
 ---
 
+## Live dashboard
+
+`dashboard/index.html` is a **single, self-contained HTML file** — no server, no framework, no npm install, no CORS issues. `scripts_dashboard/export_dashboard_data.py` bakes the finished workbook's data directly into that file at build time (along with the Chart.js and SheetJS libraries themselves), so opening it always works, even with zero internet access. An optional **"↻ Reload live from Excel"** button re-parses `outputs/DC_Capacity_Forecast.xlsx` directly in the browser when the project is served over http/https.
+
+<p align="center">
+  <img src="docs/images/rp-preview-01-overview.png" alt="DC Capacity Forecasting dashboard — executive summary and 21 headline KPIs" width="900"><br>
+  <em>Executive summary and 21 headline KPIs across network overview, demand &amp; fulfillment, staffing &amp; capacity risk, and forecast accuracy.</em>
+</p>
+
+<p align="center">
+  <img src="docs/images/rp-preview-02-pipeline.png" alt="Data flow / pipeline architecture diagram" width="900"><br>
+  <em>How the forecast is built — inputs, the Dynamic Spatial Share allocation model, and outputs, in one diagram.</em>
+</p>
+
+<p align="center">
+  <img src="docs/images/rp-preview-03-network-dc.png" alt="Network trends and DC-level analysis" width="900"><br>
+  <em>Network utilization trend, staffing, weekday seasonality, and DC-level risk/region/service-type breakdowns.</em>
+</p>
+
+<p align="center">
+  <img src="docs/images/rp-preview-04-accuracy-service.png" alt="Forecast accuracy and service level sections" width="900"><br>
+  <em>Actual-vs-predicted backtest trend, 8 accuracy metrics, on-time delivery rate by DC, and staffing needs by DC.</em>
+</p>
+
+<p align="center">
+  <img src="docs/images/rp-preview-05-planning-footer.png" alt="Planning, what-if scenarios, and staff reallocation" width="900"><br>
+  <em>Multi-DC capacity-expansion ranking, cost/benefit tradeoffs, and the recommended staff reallocation plan.</em>
+</p>
+
+**Open it:** double-click `dashboard/index.html` — no setup required. To use the live-reload button instead, run `python -m http.server 8000` from the project root and open `http://localhost:8000/dashboard/`.
+
+---
+
+## What's new since the original model
+
+On top of the original allocation/forecasting/backtesting engine, this build adds four new analyses (`src/advanced_analysis.py`) that surface decision-ready value that was already latent in the data but not previously reported on its own:
+
+- **On-Time Delivery Rate** — the forecast already split delivered volume into same-day vs. deferred-from-a-closed-day at the row level; this rolls it up into a proper network- and DC-level service-level KPI (95.5% network-wide in the sample data).
+- **Staff Reallocation Plan** — greedily pairs each at-risk DC with the best-fitting surplus donor DC (same service type preferred) and recommends a specific, conservative shift-transfer size.
+- **Backtest Daily Trend** — the day-by-day actual-vs-predicted series the aggregate backtest metrics were computed from, now available to chart directly.
+- **Multi-DC What-If Comparison** — re-runs the capacity-expansion scenario for the top at-risk DCs and ranks them by net economic benefit, turning one scenario into a prioritized investment shortlist.
+
+The Excel workbook grew from 11 to **16 sheets** to carry these (plus a new Region Summary rollup); the dashboard is entirely new.
+
+---
+
 ## The problem
 
 NovaCart's Commercial team forecasts *one* number every month: total items
@@ -76,7 +122,9 @@ Order Cycle Time ─────────┘                                 
                         (MAE/RMSE/WAPE/MAPE)        (at-risk / surplus DCs)      (capacity expansion + $)
                                     └───────────────────────────┬──────────────────────────┘
                                                                  ▼
-                                                 📊 Excel Workbook (11 sheets)
+                                                 📊 Excel Workbook (16 sheets)
+                                                                 │
+                                                     🖥️  Interactive Dashboard
 ```
 
 Full step-by-step logic: [`docs/methodology.md`](docs/methodology.md).
@@ -95,6 +143,8 @@ produces a 30-day forecast with:
 | DCs at structural risk | 2 |
 | DCs with surplus capacity | 4 |
 | WAPE (capacity-constrained, items) | ~12% |
+| Network on-time delivery rate | ~95.5% |
+| Undelivered backlog at horizon end | ~6,000 items |
 
 **Network utilization over the forecast horizon** — the recurring spikes are
 demand rolling forward from DCs that close one day a week:
@@ -108,9 +158,11 @@ and surplus DCs (grey) sit at either end of a mostly healthy network:
 
 A full sample output workbook is included at
 [`outputs/DC_Capacity_Forecast.xlsx`](outputs/DC_Capacity_Forecast.xlsx) —
-11 sheets covering the forecast, network/DC summaries, at-risk & surplus DC
-lists, backtest metrics, a what-if scenario, methodology, and a one-page
-management summary.
+16 sheets covering the forecast, network/DC/region summaries, at-risk & surplus DC
+lists, on-time delivery rate, staff reallocation plan, backtest metrics and daily
+trend, single- and multi-DC what-if scenarios, methodology, and a one-page
+management summary. See [Live dashboard](#live-dashboard) above for the same
+data rendered interactively.
 
 ## Project structure
 
@@ -120,10 +172,18 @@ dc-capacity-forecasting/
 ├── docs/
 │   ├── case_study.md             # the original task brief
 │   ├── methodology.md            # full methodology write-up
-│   └── images/                   # charts used in this README
+│   └── images/                   # charts and dashboard screenshots used in this README
 ├── outputs/                      # generated Excel workbook lands here
+├── dashboard/
+│   ├── index.html                # the dashboard -- fully self-contained, data embedded at build time
+│   └── assets/
+│       └── milad-shabani.jpg     # creator photo shown in the dashboard footer
 ├── scripts/
 │   └── generate_sample_data.py   # synthetic data generator
+├── scripts_dashboard/
+│   ├── export_dashboard_data.py  # embeds workbook data + Chart.js/SheetJS into dashboard/index.html
+│   ├── build_all.py              # runs the full pipeline (model + dashboard embed) in one command
+│   └── vendor/                   # vendored Chart.js + SheetJS (for fully offline builds)
 ├── src/
 │   ├── config.py                 # all tunable parameters live here
 │   ├── date_utils.py
@@ -132,8 +192,11 @@ dc-capacity-forecasting/
 │   ├── backtesting.py            # leave-one-day-out validation
 │   ├── capacity_analysis.py      # risk/surplus classification
 │   ├── scenario_analysis.py      # what-if capacity expansion + cost/benefit
+│   ├── advanced_analysis.py      # on-time rate, staff reallocation, backtest trend, multi-DC scenario
 │   ├── report_export.py          # styled multi-sheet Excel export
 │   └── main.py                   # orchestrates the full pipeline
+├── publish_to_github.sh          # push local changes to this repo (macOS/Linux)
+├── publish.bat                   # one-click equivalent for Windows (requires git + GitHub CLI)
 ├── requirements.txt
 └── README.md
 ```
@@ -141,20 +204,23 @@ dc-capacity-forecasting/
 ## Getting started
 
 ```bash
-git clone https://github.com/<your-username>/dc-capacity-forecasting.git
-cd dc-capacity-forecasting
+git clone https://github.com/Milad-Shabani/Resource-planning-capacity-forecasting.git
+cd Resource-planning-capacity-forecasting
 pip install -r requirements.txt
 
 # 1. Generate the synthetic input dataset
 python scripts/generate_sample_data.py
 
-# 2. Run the full pipeline (forecast -> backtest -> capacity analysis -> Excel export)
-python -m src.main
+# 2. Run the full pipeline AND embed the results into the dashboard, in one command
+python scripts_dashboard/build_all.py
+
+# (equivalent to running `python -m src.main` followed by
+#  `python scripts_dashboard/export_dashboard_data.py` separately)
 ```
 
-Output lands in `outputs/DC_Capacity_Forecast.xlsx`. Tune the forecast
-horizon, staffing ratio, or risk thresholds in `src/config.py` — everything
-else in the pipeline reads from there.
+Output lands in `outputs/DC_Capacity_Forecast.xlsx`, and `dashboard/index.html`
+is updated to match. Tune the forecast horizon, staffing ratio, or risk
+thresholds in `src/config.py` — everything else in the pipeline reads from there.
 
 ### Using your own data
 
@@ -167,16 +233,32 @@ for the exact column expectations).
 
 - **Python** (pandas, NumPy) for the modeling pipeline
 - **openpyxl** for the styled, stakeholder-ready Excel export
-- **matplotlib** (optional) for the charts in this README
+- **matplotlib** (optional) for the static charts in this README
+- **Chart.js** and **SheetJS**, vendored and inlined, for the fully offline interactive dashboard
+
+## Publishing changes to this repo
+
+**macOS / Linux:**
+```bash
+chmod +x publish_to_github.sh
+./publish_to_github.sh
+```
+
+**Windows** (requires [git](https://git-scm.com/) and the [GitHub CLI](https://cli.github.com/), authenticated via `gh auth login`):
+```bat
+publish.bat
+```
+
+Both scripts commit and push to this repo's existing `origin` remote and leave GitHub Pages configured to serve `dashboard/index.html` via GitHub Actions -- see **Settings → Pages → Source → GitHub Actions** if it isn't already set that way.
 
 ## Limitations & future work
 
 This is a business-logic allocation model, not a demand-generating
 time-series model — it deliberately trades some sophistication for
 transparency and auditability, which matters in an operations-planning
-context. Known limitations and ideas for extending it (native sales
-forecasting, multi-scenario optimization, external-factor integration, a BI
-dashboard) are documented in
+context. Known limitations and ideas for extending it further (native sales
+forecasting, true multi-scenario optimization across many levers at once,
+external-factor integration) are documented in
 [`docs/methodology.md#8-future-development-ideas`](docs/methodology.md#8-future-development-ideas).
 
 ## About

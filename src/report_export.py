@@ -66,7 +66,9 @@ def write_text_block(ws, lines):
 
 
 def build_workbook(*, forecast_output, network_daily, dc_monthly, at_risk, surplus,
-                    risk_by_type, backtest_summary, undelivered, scenario, methodology_lines,
+                    risk_by_type, backtest_summary, undelivered, scenario,
+                    on_time_by_dc, network_on_time_rate, realloc_plan, backtest_daily,
+                    multi_scenario, region_stats, methodology_lines,
                     management_summary_lines, output_path):
     wb = Workbook()
 
@@ -157,6 +159,45 @@ def build_workbook(*, forecast_output, network_daily, dc_monthly, at_risk, surpl
     detail_cols = [c for c in scenario["detail"].columns]
     write_df(ws9, scenario["detail"][detail_cols])
 
+    ws10 = wb.create_sheet("On-Time Delivery Rate")
+    ws10.append([f"Network-wide on-time delivery rate (same-day, not deferred from a closed day): {network_on_time_rate*100:.1f}%"])
+    ws10.cell(row=1, column=1).font = SECTION_FONT
+    ws10.append(["A new metric surfaced from data the original model already computed per row (same-day vs. "
+                 "deferred demand) but did not previously roll up into its own service-level KPI."])
+    ws10.cell(row=2, column=1).font = ITALIC_FONT
+    ws10.append([])
+    write_df(ws10, on_time_by_dc, pct_cols=["on_time_rate"])
+
+    ws11 = wb.create_sheet("Staff Reallocation Plan")
+    ws11.append(["Greedy pairing of each at-risk DC with the best-fitting surplus DC (same Service Type "
+                 "preferred), sized to close roughly half the staffing gap -- a conservative first move."])
+    ws11.cell(row=1, column=1).font = ITALIC_FONT
+    ws11.append([])
+    if len(realloc_plan):
+        write_df(ws11, realloc_plan, pct_cols=["At-Risk Utilization", "Donor Utilization"])
+    else:
+        ws11.append(["(no at-risk/surplus DC pairs to reallocate between)"])
+
+    ws12 = wb.create_sheet("Backtest Daily Trend")
+    ws12.append(["Day-by-day network-wide actual vs. capacity-constrained predicted volume -- "
+                 "the time series the aggregate backtest metrics on 'Validation - Backtest' were computed from."])
+    ws12.cell(row=1, column=1).font = ITALIC_FONT
+    ws12.append([])
+    write_df(ws12, backtest_daily)
+
+    ws13 = wb.create_sheet("Multi-DC What-If Comparison")
+    ws13.append(["The single-DC What-If scenario, re-run for the top at-risk DCs and ranked by net economic "
+                 "benefit -- turns one scenario into a prioritized capital-investment shortlist."])
+    ws13.cell(row=1, column=1).font = ITALIC_FONT
+    ws13.append([])
+    if len(multi_scenario):
+        write_df(ws13, multi_scenario, pct_cols=["Pre-Scenario Avg. Utilization"])
+    else:
+        ws13.append(["(no at-risk DCs to compare)"])
+
+    ws14 = wb.create_sheet("Region Summary")
+    write_df(ws14, region_stats, pct_cols=["Avg_Utilization"])
+
     ws_meth = wb.create_sheet("Methodology")
     ws_meth.column_dimensions["A"].width = 120
     write_text_block(ws_meth, methodology_lines)
@@ -165,8 +206,14 @@ def build_workbook(*, forecast_output, network_daily, dc_monthly, at_risk, surpl
     ws_mgmt.column_dimensions["A"].width = 120
     write_text_block(ws_mgmt, management_summary_lines)
 
-    wb.move_sheet("Management Summary", offset=-10)
-    wb.move_sheet("Methodology", offset=-10)
+    order = [
+        "Methodology", "Management Summary", "Forecast Output", "Network Daily Summary",
+        "DC Monthly Summary", "At-Risk DCs", "Surplus Capacity DCs", "Risk by Service Type",
+        "Region Summary", "On-Time Delivery Rate", "Staff Reallocation Plan",
+        "Validation - Backtest", "Backtest Daily Trend", "Undelivered at Horizon End",
+        "What-If Scenario Analysis", "Multi-DC What-If Comparison",
+    ]
+    wb._sheets = [wb[name] for name in order]
 
     wb.save(output_path)
     return output_path
