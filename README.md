@@ -196,7 +196,6 @@ dc-capacity-forecasting/
 │   ├── report_export.py          # styled multi-sheet Excel export
 │   └── main.py                   # orchestrates the full pipeline
 ├── publish_to_github.sh          # push local changes to this repo (macOS/Linux)
-├── publish.bat                   # one-click equivalent for Windows (requires git + GitHub CLI)
 ├── requirements.txt
 └── README.md
 ```
@@ -244,12 +243,7 @@ chmod +x publish_to_github.sh
 ./publish_to_github.sh
 ```
 
-**Windows** (requires [git](https://git-scm.com/) and the [GitHub CLI](https://cli.github.com/), authenticated via `gh auth login`):
-```bat
-publish.bat
-```
-
-Both scripts commit and push to this repo's existing `origin` remote and leave GitHub Pages configured to serve `dashboard/index.html` via GitHub Actions -- see **Settings → Pages → Source → GitHub Actions** if it isn't already set that way.
+The script commits and pushes to this repo's existing `origin` remote and leaves GitHub Pages configured to serve `dashboard/index.html` via GitHub Actions -- see **Settings → Pages → Source → GitHub Actions** if it isn't already set that way.
 
 ## Limitations & future work
 
